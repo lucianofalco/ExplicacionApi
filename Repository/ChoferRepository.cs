@@ -2,9 +2,15 @@ using System.Reflection.Metadata.Ecma335;
 using System.Runtime.CompilerServices;
 using Microsoft.Data.Sqlite;
 
-public class ChoferRepository
+public class ChoferRepository : IChoferRepository
 {
-    private string _ConnectionString = "Data Source=DB/remiseria.db;";
+    private readonly string _ConnectionString; // = "Data Source=DB/remiseria.db;";
+
+    public ChoferRepository(string ConnectionString)
+    {
+        _ConnectionString = ConnectionString;
+    }
+
     public bool crearChofer(Chofer c)
     {
 
@@ -81,7 +87,7 @@ public class ChoferRepository
             }
         }
 
-        chofer = c ;
+        chofer = c;
 
         return chofer;
     }
@@ -92,11 +98,11 @@ public class ChoferRepository
         using (SqliteConnection connection = new SqliteConnection(_ConnectionString))
         {
             connection.Open();
-            string buscoChofer = "select * " + 
+            string buscoChofer = "select * " +
                                 "from chofer " +
-                                "inner join calificacion "+ 
-                                "using(id_chofer) " + 
-                                "where id_chofer = 1 ;";
+                                "left join calificacion " +
+                                "using(id_chofer) " +
+                                "where id_chofer = @id ;";
             var commandChofer = new SqliteCommand(buscoChofer, connection);
             commandChofer.Parameters.AddWithValue("@id", id);
             using (var reader = commandChofer.ExecuteReader())
@@ -104,18 +110,71 @@ public class ChoferRepository
                 chofer = new Chofer();
                 while (reader.Read())
                 {
-                    var calificacion = new Calificacion();
                     chofer.id_Chofer = Convert.ToInt32(reader["id_chofer"]);
                     chofer.Nombre = reader["Nombre"].ToString();
-                    calificacion.calificacion = Convert.ToInt32(reader["Calificacion"]);
-                    calificacion.comentario = reader["Comentario"].ToString();
-                    calificacion.id_calificacion =  Convert.ToInt32(reader["id_Calificacion"]);
-                    calificacion.id_chofer = Convert.ToInt32(reader["id_chofer"]);
-                    chofer.calificaciones.Add(calificacion);
+                    chofer.calificaciones = new List<Calificacion>();
+                    if (!string.IsNullOrEmpty(reader["id_Calificacion"].ToString())) //!reader.IsDBNull(reader.GetOrdinal("id_calificacion"))
+                    {
+                        var calificacion = new Calificacion();
+                        calificacion.calificacion = Convert.ToInt32(reader["Calificacion"]);
+                        calificacion.comentario = reader["Comentario"].ToString();
+                        calificacion.id_calificacion = Convert.ToInt32(reader["id_Calificacion"]);
+                        calificacion.id_chofer = Convert.ToInt32(reader["id_chofer"]);
+                        chofer.calificaciones.Add(calificacion);
+                    }
+                }
+            }
+            return chofer;
+
+        }
+    }
+    public Chofer AsignarCalifiacion(int id, Calificacion calificacion)
+    {
+        Chofer chofer = BuscarChofer(id);
+        if (chofer is not null) chofer.calificaciones.Add(calificacion);
+
+        return chofer;
+    }
+
+    public double promedioCalificacion(int id_chofer)
+    {
+        double promedio = 0;
+        using (var connection = new SqliteConnection(_ConnectionString))
+        {
+            connection.Open();
+            string querystring = "select avg(calificacion) as promedio from calificacion where id_chofer = '@id_chofer' ;";
+            var command = new SqliteCommand(querystring, connection);
+            command.Parameters.AddWithValue("@id_chofer", id_chofer);
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    promedio = Convert.ToDouble(reader["promedio"]);
                 }
             }
         }
-        return chofer;
+        return promedio ;
 
     }
+
+    public int cant_Calificacion(int id){
+
+        int cantidad = 0 ;
+        using (var connection = new SqliteConnection(_ConnectionString))
+        {
+            connection.Open();
+            string querystring = "select count(id_Calificacion) as cantidad from chofer inner join calificacion using (id_chofer) where id_chofer = '@id' ;";
+            var command = new SqliteCommand(querystring, connection);
+            command.Parameters.AddWithValue("@id", id);
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    cantidad = Convert.ToInt32(reader["cantidad"]);
+                }
+            }
+        }
+        return cantidad ;
+    }
+
 }

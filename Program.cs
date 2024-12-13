@@ -1,4 +1,12 @@
+using Microsoft.Data.Sqlite;
+
+
+
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddScoped<IChoferRepository , ChoferRepository>();
+var connectionString = builder.Configuration.GetConnectionString("sqliteConnecion")!.ToString();
+builder.Services.AddSingleton<string>(connectionString);
+
 
 // Inicializa SQLite
 SQLitePCL.Batteries.Init();
